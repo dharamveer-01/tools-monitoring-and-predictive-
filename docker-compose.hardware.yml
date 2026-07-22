@@ -1,0 +1,31 @@
+# docker-compose.override.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# REAL HARDWARE MODE — use this file to disable simulated substations
+# when connecting real USB sensors or Android phones from your host machine.
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.override.yml up backend frontend
+#
+# Then on your host machine run real hardware clients:
+#   python substations/substation_client.py --id S1 --host localhost
+#   python substations/substation_client.py --id S2 --host localhost --source adb
+#   python substations/substation_client.py --id S3 --host localhost
+#
+# NOTE: This file is NOT auto-loaded by default.
+# Docker Compose only auto-loads docker-compose.override.yml if it exists
+# in the same directory. Rename it to docker-compose.hardware.yml to prevent
+# accidental loading, or use explicit -f flags as shown above.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  substation-s1:
+    profiles:
+      - hardware-only
+
+  substation-s2:
+    profiles:
+      - hardware-only
+
+  substation-s3:
+    profiles:
+      - hardware-only

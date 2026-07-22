@@ -1,0 +1,162 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Industrial Smart Grid AI — Docker Compose
+#
+# Services:
+#   backend    — FastAPI + AI socket server (ports 8000 + 9999)
+#   frontend   — React dashboard served by nginx (port 80)
+#   substation-s1 — Healthy simulated substation
+#   substation-s2 — Faulty simulated substation (fault injection)
+#   substation-s3 — Healthy simulated substation
+#
+# Volumes:
+#   saved_models — persists trained ML models across restarts
+#
+# Usage:
+#   Full stack (backend + frontend + 3 simulated substations):
+#     docker-compose up --build
+#
+#   Server only (connect real hardware from outside Docker):
+#     docker-compose up --build backend frontend
+#
+#   Rebuild after code changes:
+#     docker-compose up --build --force-recreate
+#
+#   Stop everything:
+#     docker-compose down
+#
+#   Stop and delete volumes (fresh start):
+#     docker-compose down -v
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── AI Backend ──────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: smartgrid-backend
+    ports:
+      - "8000:8000"   # FastAPI REST API
+      - "9999:9999"   # TCP socket for substation telemetry
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      # Alert channels — set real values in .env file
+      - ALERT_EMAIL_FROM=${ALERT_EMAIL_FROM:-}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-}
+      - ALERT_EMAIL_PASSWORD=${ALERT_EMAIL_PASSWORD:-}
+      - ALERT_SMTP_HOST=${ALERT_SMTP_HOST:-smtp.gmail.com}
+      - ALERT_SMTP_PORT=${ALERT_SMTP_PORT:-587}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
+      - TWILIO_TO_NUMBER=${TWILIO_TO_NUMBER:-}
+      - DB_URL=${DB_URL:-}
+    volumes:
+      # Persist trained ML models — no retraining on restart
+      - saved_models:/app/ml_models/saved_models
+    networks:
+      - grid_net
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  # ── React Frontend (nginx) ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Leave empty — nginx proxies all API calls on same origin
+        # Browser never needs to know about the backend container hostname
+        VITE_API_BASE_URL: ""
+    container_name: smartgrid-frontend
+    ports:
+      - "80:80"
+    networks:
+      - grid_net
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ── Substation S1 — Healthy ─────────────────────────────────────────────────
+  substation-s1:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: smartgrid-s1
+    command: python substations/substation_client.py --id S1 --host backend --server-port 9999 --simulate
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - grid_net
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
+  # ── Substation S2 — Faulty (fault injection enabled) ───────────────────────
+  substation-s2:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: smartgrid-s2
+    command: python substations/substation_client.py --id S2 --host backend --server-port 9999 --simulate --faulty
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - grid_net
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
+  # ── Substation S3 — Healthy ─────────────────────────────────────────────────
+  substation-s3:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: smartgrid-s3
+    command: python substations/substation_client.py --id S3 --host backend --server-port 9999 --simulate
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - grid_net
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+volumes:
+  saved_models:
+    driver: local
+    # Models are stored here and survive container restarts/rebuilds
+
+networks:
+  grid_net:
+    driver: bridge

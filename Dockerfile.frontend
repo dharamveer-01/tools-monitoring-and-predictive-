@@ -1,0 +1,37 @@
+# ── Frontend Dockerfile (multi-stage) ────────────────────────────────────────
+# Stage 1: Build the React app
+# Vite 6 works with Node 20 LTS (uses Rollup, not rolldown)
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies
+COPY dashboard/frontend/package*.json ./
+RUN npm install --legacy-peer-deps
+
+# Copy source
+COPY dashboard/frontend/ ./
+
+# VITE_API_BASE_URL: empty = same-origin (nginx proxies API calls)
+ARG VITE_API_BASE_URL=
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+# Build the React app
+RUN npm run build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2: Serve with nginx (tiny, production-ready)
+FROM nginx:alpine
+
+# Copy built React files
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# nginx config: SPA routing + API proxy to backend service
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]

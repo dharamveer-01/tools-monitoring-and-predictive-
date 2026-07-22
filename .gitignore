@@ -1,0 +1,67 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env.local
+.env.*.local
+
+# ── Secrets — NEVER commit these ─────────────────────────────────────────────
+.env
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# ── ML models ─────────────────────────────────────────────────────────────────
+ml_models/saved_models/*.pkl
+ml_models/saved_models/*.h5
+ml_models/saved_models/*.keras
+ml_models/saved_models/*.joblib
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+data/raw/
+data/processed/
+*.csv
+*.parquet
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dashboard/frontend/dist/
+dashboard/frontend/.env
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.dockerignore

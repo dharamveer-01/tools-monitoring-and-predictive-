@@ -1,0 +1,32 @@
+# ── Backend Dockerfile ────────────────────────────────────────────────────────
+# Python 3.11-slim (3.14 not yet on Docker Hub; 3.11 is LTS and sklearn-compatible)
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps: gcc for numpy/sklearn compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first (layer cached unless requirements.txt changes)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY . .
+
+# Create saved_models directory (will be overridden by volume mount)
+RUN mkdir -p ml_models/saved_models
+
+# Expose FastAPI REST port and TCP socket port
+EXPOSE 8000 9999
+
+# Health check — wait for FastAPI to be ready
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
+
+CMD ["python", "api/main.py"]
